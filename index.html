@@ -1,41 +1,42 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Trompos de Gido</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
+
 <body>
   <div class="wrap">
     <header>
       <div class="title">Trompos de Gido </span></div>
-      <div class="pill">Tiempo: <b id="ui-time">0.0</b>s</div>
-      <div class="pill">Puntaje: <b id="ui-score">0</b></div>
-      <div class="pill">Récord: <b id="ui-best">0</b></div>
+      <div class="info">
+        <div class="pill">Tiempo: <b id="ui-time">0.0</b>s</div>
+        <div class="pill">Puntaje: <b id="ui-score">0</b></div>
+        <div class="pill">Récord: <b id="ui-best">0</b></div>
+      </div>
       <button class="btn" id="btn-toggle">Iniciar</button>
     </header>
 
     <main>
       <div class="stage">
-        <canvas id="game" width="960" height="540" aria-label="Zetsu Escape canvas"></canvas>
+        <canvas id="game" width="960" height="540" aria-label="Trompos de Gido"></canvas>
         <div class="overlay" id="overlay">
           <div class="card" id="help">
             <h2>Sobrevive el maximo tiempo posible a los trompos de Gido</h2>
-            <p>Mueve a gon para que esquive los trompos de gido, puedes recuperar vida con las esferas de Nen repartidas por el mapa.</p>
-            <p><span class="kbd">WASD</span> / flechas • <span class="kbd">Espacio</span> Pausa • <span class="kbd">R</span> Reiniciar</p>
+            <p>Mueve a gon para que esquive los trompos de gido, puedes recuperar vida con las esferas de Nen repartidas
+              por el mapa.</p>
+            <p><span class="kbd">WASD</span> / flechas • <span class="kbd">Espacio</span> Pausa • <span
+                class="kbd">R</span> Reiniciar</p>
             <p></p>
           </div>
         </div>
       </div>
     </main>
-
-    <footer>
-      <span>HTML/CSS/JS puros.</span>
-      <span>Récord en <code>localStorage</code>.</span>
-      <span>Audio con Web Audio API.</span>
-    </footer>
   </div>
-    <script src="js/game.js"></script>
+  <script src="js/game.js"></script>
 </body>
+
 </html>

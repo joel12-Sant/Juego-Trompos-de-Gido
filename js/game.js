@@ -1,7 +1,3 @@
-/*************************
- * Zetsu Escape (Canvas)
- * Solo JavaScript (trompos)
- *************************/
 (function () {
   const cvs = document.getElementById('game');
   const ctx = cvs.getContext('2d');
@@ -13,9 +9,12 @@
     overlay: document.getElementById('overlay'),
     help: document.getElementById('help')
   };
+  // === Fondo: imagen Coliseo (cover) ===
+  const BG = new Image();
+  let bgReady = false;
+  BG.onload = () => { bgReady = true; };
+  BG.src = 'sources/arena_coliseo.png';
 
-  // ======= Audio: Web Audio API (música generativa simple + SFX) =======
-  // ======= Audio: Web Audio API (generativa + SFX + LOOP de fondo) =======
   const AudioSys = (() => {
     let ac, musicGain, sfxGain, bgGain, musicInterval;
     let bgBuffer = null, bgSource = null;
@@ -27,17 +26,15 @@
       sfxGain = ac.createGain();
       bgGain = ac.createGain();
 
-      // Volúmenes (ajusta a gusto)
-      musicGain.gain.value = 0.05; // generativa
-      sfxGain.gain.value = 0.25; // efectos
-      bgGain.gain.value = 0.12; // loop de fondo
+      musicGain.gain.value = 0.01;
+      sfxGain.gain.value = 0.15;
+      bgGain.gain.value = 0.09;
 
       musicGain.connect(ac.destination);
       sfxGain.connect(ac.destination);
       bgGain.connect(ac.destination);
     }
 
-    // --- SFX básicos ---
     function beep(freq = 440, dur = .08) {
       if (!ac) return;
       const o = ac.createOscillator(), g = ac.createGain();
@@ -52,14 +49,13 @@
     const hit = () => beep(180, .12);
     const pickup = () => beep(720, .08);
 
-    // --- Música generativa (tu efecto actual) ---
     function startMusic() {
       if (!ac) return;
       stopMusic();
       musicInterval = setInterval(() => {
         const o = ac.createOscillator(), g = ac.createGain();
         const base = [220, 247, 262, 294, 330, 349, 392][Math.floor(Math.random() * 7)];
-        o.frequency.value = base * (Math.random() < .3 ? 1.5 : 1);
+        o.frequency.value = base * (Math.random() < 10 ? 1.5 : 1);
         o.type = 'sine';
         o.connect(g); g.connect(musicGain);
         const t = ac.currentTime;
@@ -74,7 +70,6 @@
       musicInterval = null;
     }
 
-    // --- LOOP de fondo desde archivo ---
     async function loadBackground(url) {
       init();
       const res = await fetch(url);
@@ -83,7 +78,7 @@
     }
     function startBackground() {
       if (!ac || !bgBuffer) return;
-      stopBackground(); // siempre crear un source nuevo
+      stopBackground();
       bgSource = ac.createBufferSource();
       bgSource.buffer = bgBuffer;
       bgSource.loop = true;
@@ -98,7 +93,6 @@
       }
     }
 
-    // (Opcional) helpers de volumen
     function setBgVolume(v) { if (bgGain) bgGain.gain.value = v; }
     function setMusicVolume(v) { if (musicGain) musicGain.gain.value = v; }
     function setSfxVolume(v) { if (sfxGain) sfxGain.gain.value = v; }
@@ -110,15 +104,13 @@
       setBgVolume, setMusicVolume, setSfxVolume
     };
   })();
-  // Carga del loop de fondo (ruta relativa al HTML)
+
   AudioSys.loadBackground('audio/hunterxhunter.mp3').catch(console.error);
+  AudioSys.setBgVolume(0.05)
 
-
-  // ======= Utilidades =======
   const rnd = (a, b) => Math.random() * (b - a) + a;
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-  // ======= Estado del juego =======
   const S = {
     running: false, paused: true, t0: 0, time: 0, dt: 0, last: 0,
     score: 0, best: Number(localStorage.getItem('zetsu_best') || 0),
@@ -129,7 +121,6 @@
   };
   ui.best.textContent = S.best;
 
-  // ======= Entrada ======= 
   window.addEventListener('keydown', (e) => { if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault(); S.keys[e.key.toLowerCase()] = true; if (e.key === ' ') { togglePause(); } if (e.key.toLowerCase() === 'r') { reset(); } });
   window.addEventListener('keyup', (e) => { S.keys[e.key.toLowerCase()] = false });
   ui.btn.addEventListener('click', () => { if (S.paused && !S.running) { start(); } else { togglePause(); } });
@@ -139,8 +130,8 @@
     S.running = true; S.paused = false; S.t0 = performance.now(); S.last = S.t0;
     ui.overlay.style.display = 'none'; ui.btn.textContent = 'Pausa';
     AudioSys.init();
-    AudioSys.startMusic();        // música generativa (ya estaba)
-    AudioSys.startBackground();   // >>> loop de fondo <<<
+    AudioSys.startMusic();
+    AudioSys.startBackground();
   }
 
   function togglePause() {
@@ -173,9 +164,7 @@
     ui.help.innerHTML = `<h2>✨ Entrena tu <em>Zetsu</em>: evita las balas de aura</h2><p>Mueve al orbe (tu aura) y sobrevive lo más que puedas. El juego acelera con el tiempo.</p><p><span class="kbd">WASD</span> / flechas • <span class="kbd">Espacio</span> Pausa • <span class="kbd">R</span> Reiniciar</p><p>Bonus: recoge <span style="color:var(--good)">💚 auras</span> para subir puntaje y sanar.</p>`;
   }
 
-  // ======= Spawners =======
   function spawnBullet() {
-    // proyectiles (trompos): desde bordes, hacia el jugador
     const side = Math.floor(rnd(0, 4));
     let x, y, vx, vy;
     if (side === 0) { x = -10; y = rnd(0, cvs.height); }
@@ -188,13 +177,11 @@
     const r = rnd(6, 10);
     S.bullets.push({ x, y, r, vx, vy, life: 10, angle: rnd(0, Math.PI * 2), spin: rnd(4, 8), wobble: rnd(.6, 1.2) });
   }
-  function spawnPickup() { // pequeños orbes verdes que suben puntaje/vida
+  function spawnPickup() {
     S.pickups.push({ x: rnd(30, cvs.width - 30), y: rnd(30, cvs.height - 30), r: 7, life: 8 });
   }
 
-  // ======= Update =======
   function update(dt) {
-    // dificultad progresiva
     S.time += dt; ui.time.textContent = S.time.toFixed(1);
     S.level = 1 + Math.floor(S.time / 10);
     S.spawnEvery = clamp(.8 - S.time * 0.01, .18, .8);
@@ -221,8 +208,7 @@
         if (p.hp <= 0) { gameOver(); }
       }
     }
-    // ======= NUEVO: colisiones elásticas entre trompos =======
-    // (dejado aquí siguiendo tu última versión)
+
     for (let i = 0; i < S.bullets.length; i++) {
       for (let j = i + 1; j < S.bullets.length; j++) {
         const a = S.bullets[i], b = S.bullets[j];
@@ -234,25 +220,20 @@
 
         if (dist2 <= minDist * minDist) {
           const dist = Math.sqrt(dist2) || 1;
-          const nx = dx / dist, ny = dy / dist;        // normal de colisión
+          const nx = dx / dist, ny = dy / dist;
 
-          // Velocidad relativa proyectada en la normal
           const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
           const relVelN = rvx * nx + rvy * ny;
 
-          // Si ya se están separando, no aplicar impulso
           if (relVelN < 0) {
-            const e = 1.0; // restitución (1 = elástico)
-            // masas iguales m1 = m2 = 1 => (1/m1 + 1/m2) = 2
+            const e = 1.0;
             const j = -(1 + e) * relVelN / 2;
 
-            // Impulso
             const ix = j * nx, iy = j * ny;
             a.vx -= ix; a.vy -= iy;
             b.vx += ix; b.vy += iy;
           }
 
-          // Corrección de penetración
           const penetration = minDist - dist;
           if (penetration > 0) {
             const percent = 0.8;
@@ -266,7 +247,6 @@
       }
     }
 
-    // pickups
     for (let i = S.pickups.length - 1; i >= 0; i--) {
       const c = S.pickups[i];
       c.life -= dt; if (c.life <= 0) { S.pickups.splice(i, 1); continue; }
@@ -277,7 +257,7 @@
 
   // ======= Render =======
 
-  // Helper para dibujar anillos
+  //para dibujar anillos
   function ringSegment(cx, cy, r0, r1, a0, a1) {
     ctx.beginPath();
     ctx.arc(cx, cy, r1, a0, a1);
@@ -285,7 +265,7 @@
     ctx.closePath();
   }
 
-  // Paleta/estilo del trompo de Gido (inspirado)
+  // Estilos del trompo
   const GIDO = {
     rimA: '#c7ccd4',
     rimB: '#8f99a6',
@@ -469,19 +449,19 @@
   }
 
   function draw() {
-    // fondo con líneas de aura
-    ctx.clearRect(0, 0, cvs.width, cvs.height);
-
-    // grid animado sutil
-    const t = S.time;
-    ctx.save();
-    ctx.globalAlpha = .15;
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1;
-    const spacing = 40; const off = (t * 20) % spacing;
-    for (let x = -off; x < cvs.width; x += spacing) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, cvs.height); ctx.stroke(); }
-    for (let y = -off; y < cvs.height; y += spacing) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cvs.width, y); ctx.stroke(); }
-    ctx.restore();
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+  if (bgReady) {
+    const iw = BG.naturalWidth || BG.width;
+    const ih = BG.naturalHeight || BG.height;
+    const scale = Math.max(cvs.width / iw, cvs.height / ih);
+    const dw = iw * scale, dh = ih * scale;
+    const dx = (cvs.width - dw) / 2, dy = (cvs.height - dh) / 2;
+    ctx.drawImage(BG, dx, dy, dw, dh);
+  } else {
+    // placeholder mientras carga
+    ctx.fillStyle = '#0b0f13';
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+  }
 
     // ===== jugador: cara de Gon =====
     const p = S.player;
