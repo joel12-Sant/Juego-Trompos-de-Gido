@@ -43,7 +43,7 @@
   };
   ui.best.textContent = S.best;
 
-  // ======= Entrada =======
+  // ======= Entrada ======= 
   window.addEventListener('keydown', (e)=>{ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault(); S.keys[e.key.toLowerCase()]=true; if(e.key===' '){ togglePause(); } if(e.key.toLowerCase()==='r'){ reset(); } });
   window.addEventListener('keyup', (e)=>{ S.keys[e.key.toLowerCase()]=false });
   ui.btn.addEventListener('click', ()=>{ if(S.paused && !S.running){ start(); } else { togglePause(); } });
@@ -115,6 +115,50 @@
         if(p.hp<=0){ gameOver(); }
       }
     }
+  // ======= NUEVO: colisiones elásticas entre trompos =======
+  // (dejado aquí siguiendo tu última versión)
+    for (let i = 0; i < S.bullets.length; i++) {
+      for (let j = i + 1; j < S.bullets.length; j++) {
+        const a = S.bullets[i], b = S.bullets[j];
+
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const ra = a.r, rb = b.r;
+        const dist2 = dx*dx + dy*dy;
+        const minDist = ra + rb;
+
+        if (dist2 <= minDist * minDist) {
+          const dist = Math.sqrt(dist2) || 1;
+          const nx = dx / dist, ny = dy / dist;        // normal de colisión
+
+          // Velocidad relativa proyectada en la normal
+          const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
+          const relVelN = rvx * nx + rvy * ny;
+
+          // Si ya se están separando, no aplicar impulso
+          if (relVelN < 0) {
+            const e = 1.0; // restitución (1 = elástico)
+            // masas iguales m1 = m2 = 1 => (1/m1 + 1/m2) = 2
+            const j = -(1 + e) * relVelN / 2;
+
+            // Impulso
+            const ix = j * nx, iy = j * ny;
+            a.vx -= ix; a.vy -= iy;
+            b.vx += ix; b.vy += iy;
+          }
+
+          // Corrección de penetración
+          const penetration = minDist - dist;
+          if (penetration > 0) {
+            const percent = 0.8;
+            const slop = 0.01;
+            const corr = Math.max(penetration - slop, 0) / 2 * percent;
+            const cx = corr * nx, cy = corr * ny;
+            a.x -= cx; a.y -= cy;
+            b.x += cx; b.y += cy;
+          }
+        }
+      }
+    }
 
     // pickups
     for(let i=S.pickups.length-1;i>=0;i--){
@@ -150,19 +194,104 @@
     tipB: '#737b87'
   };
 
+  // ======= NUEVO: Render de la cara de Gon (jugador) =======
+  const GON = {
+    skin: '#ffd7a6', skinShade:'#f2bf86', blush:'#e89a7f',
+    hair: '#0a0a0a', hairEdge:'#1b4d1a',
+    eyeWhite:'#ffffff', iris:'#f0a800', irisDark:'#c47c00', pupil:'#1a1a1a', shine:'#ffffff',
+    outline:'#ffffff', line:'#1b1b1b'
+  };
+
+  function gonOutlineFill(drawPath, fill, px){
+    ctx.save();
+    drawPath();
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.strokeStyle=GON.outline; ctx.lineWidth=Math.max(1.5, px*0.06); ctx.stroke();
+    ctx.strokeStyle=GON.line; ctx.lineWidth=Math.max(0.35, px*0.012); ctx.stroke();
+    ctx.fillStyle=fill; ctx.fill();
+    ctx.restore();
+  }
+  function drawGonHead(x, y, radius){
+    const R = radius * 3;   // tamaño visual (sin afectar colisión)
+    const px = R / 10;
+    const ELL=(cx,cy,rx,ry)=>{ ctx.beginPath(); ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); };
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(R/300, R/300);
+
+    // Cabello con picos
+    gonOutlineFill(()=>{
+      ctx.beginPath();
+      ctx.moveTo(-210,-60);
+      ctx.lineTo(-250,-170);
+      ctx.lineTo(-140,-150);
+      ctx.lineTo(-60,-230);
+      ctx.lineTo(0,-270);
+      ctx.lineTo(60,-230);
+      ctx.lineTo(140,-150);
+      ctx.lineTo(250,-170);
+      ctx.lineTo(210,-60);
+      ctx.quadraticCurveTo(120,-40, 100, -20);
+      ctx.quadraticCurveTo(0,-40, -100, -20);
+      ctx.quadraticCurveTo(-120,-40, -210,-60);
+      ctx.closePath();
+    }, GON.hair, px);
+
+    // ribete interior verdoso
+    ctx.save();
+    ctx.strokeStyle=GON.hairEdge; ctx.lineWidth=Math.max(1, px*0.8); ctx.lineJoin='round';
+    ctx.beginPath();
+    ctx.moveTo(-220,-70); ctx.lineTo(-165,-120); ctx.lineTo(-90,-190); ctx.lineTo(0,-245);
+    ctx.lineTo(90,-190); ctx.lineTo(165,-120); ctx.lineTo(220,-70);
+    ctx.stroke(); ctx.restore();
+
+    // Cara y orejas
+    gonOutlineFill(()=>{ ELL(0,40,170,170); }, GON.skin, px);
+    gonOutlineFill(()=>{ ELL(-155,35,28,35); }, GON.skin, px);
+    gonOutlineFill(()=>{ ELL(155,35,28,35); }, GON.skin, px);
+
+    // rubor
+    ctx.save(); ctx.globalAlpha=.18; ctx.fillStyle=GON.blush;
+    ELL(-70,70,50,28); ctx.fill(); ELL(70,70,50,28); ctx.fill(); ctx.restore();
+
+    // Ojos
+    const eyeY = 20;
+    gonOutlineFill(()=>{ ELL(-70, eyeY, 48, 62); }, GON.eyeWhite, px);
+    gonOutlineFill(()=>{ ELL( 70, eyeY, 48, 62); }, GON.eyeWhite, px);
+    gonOutlineFill(()=>{ ELL(-70, eyeY+6, 30, 40); }, GON.iris, px);
+    gonOutlineFill(()=>{ ELL( 70, eyeY+6, 30, 40); }, GON.iris, px);
+    ctx.save(); ctx.globalAlpha=.25; ctx.fillStyle=GON.irisDark;
+    ELL(-70, eyeY+20, 30, 24); ctx.fill(); ELL(70, eyeY+20, 30, 24); ctx.fill(); ctx.restore();
+    gonOutlineFill(()=>{ ELL(-70, eyeY+12, 16, 22); }, GON.pupil, px);
+    gonOutlineFill(()=>{ ELL( 70, eyeY+12, 16, 22); }, GON.pupil, px);
+    ctx.save(); ctx.fillStyle=GON.shine; ELL(-88, eyeY-10, 10,10); ctx.fill(); ELL(52, eyeY-10, 10,10); ctx.fill(); ctx.restore();
+
+    // Cejas
+    gonOutlineFill(()=>{ ctx.rect(-110, eyeY-58, 80, 16); }, GON.hair, px);
+    gonOutlineFill(()=>{ ctx.rect(  30, eyeY-58, 80, 16); }, GON.hair, px);
+
+    // Boca
+    ctx.save();
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.strokeStyle=GON.outline; ctx.lineWidth=Math.max(1.5, px*0.06); ctx.beginPath(); ctx.moveTo(-40, 108); ctx.quadraticCurveTo(0, 128, 40, 108); ctx.stroke();
+    ctx.strokeStyle=GON.line; ctx.lineWidth=Math.max(0.35, px*0.012); ctx.beginPath(); ctx.moveTo(-40, 108); ctx.quadraticCurveTo(0, 128, 40, 108); ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+  }
+
   // Dibuja un trompo estilo Gido, rotando según b.angle
   function drawTop(b){
-    const base = b.r;          // radio de colisión
-    const R = base * 2.2;      // radio visual para más detalle
+    const base = b.r;
+    const R = base * 2.2;
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.angle||0);
 
-    // Glow leve
     ctx.shadowColor='rgba(0,0,0,.25)';
     ctx.shadowBlur=8;
 
-    // Aro metálico exterior
     const rimGrad = ctx.createLinearGradient(-R, -R, R, R);
     rimGrad.addColorStop(0, GIDO.rimB);
     rimGrad.addColorStop(0.5, GIDO.rimA);
@@ -171,30 +300,25 @@
     ringSegment(0, 0, R*0.78, R*1.00, 0, Math.PI*2);
     ctx.fill();
 
-    // Pernos / remaches
     const studs = 12;
     for(let i=0;i<studs;i++){
       const a = i * (Math.PI*2/studs);
       const rr = R*0.93;
       const x = Math.cos(a)*rr, y = Math.sin(a)*rr;
-      // sombra
       ctx.fillStyle = GIDO.studShadow;
       ctx.beginPath(); ctx.arc(x+R*0.008, y+R*0.008, R*0.028, 0, Math.PI*2); ctx.fill();
-      // cabeza
       const g = ctx.createRadialGradient(x-R*0.01, y-R*0.01, R*0.004, x, y, R*0.03);
       g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, GIDO.studColor); g.addColorStop(1, '#b7c0cc');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R*0.026, 0, Math.PI*2); ctx.fill();
     }
 
-    // Aro delgado rojo de acento
     ctx.strokeStyle = GIDO.accent;
     ctx.lineWidth = Math.max(1, R*0.016);
     ctx.beginPath(); ctx.arc(0, 0, R*0.78, 0, Math.PI*2); ctx.stroke();
 
-    // Disco con espiral negro/amarillo
     const innerR = R*0.76;
     const turns = 6;
-    const steps = 60; // rendimiento-friendly para muchos proyectiles
+    const steps = 60;
     for (let i = 0; i < steps; i++) {
       const a0 = (i/steps) * Math.PI*2 * turns;
       const a1 = ((i+1)/steps) * Math.PI*2 * turns;
@@ -205,7 +329,6 @@
       ctx.fill();
     }
 
-    // Tapa central (cap)
     const capR = R*0.22;
     const capG = ctx.createRadialGradient(-capR*0.3, -capR*0.3, capR*0.1, 0, 0, capR);
     capG.addColorStop(0, '#fafafa');
@@ -214,16 +337,13 @@
     ctx.fillStyle = capG;
     ctx.beginPath(); ctx.arc(0, 0, capR, 0, Math.PI*2); ctx.fill();
 
-    // Tuerca central
     ctx.fillStyle = GIDO.coreInner;
     ctx.beginPath(); ctx.arc(0, 0, R*0.11, 0, Math.PI*2); ctx.fill();
 
-    // Contorno general sutil
     ctx.lineWidth = Math.max(1, R*0.018);
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.arc(0, 0, R*1.00, 0, Math.PI*2); ctx.stroke();
 
-    // Punta cónica metálica
     ctx.save();
     ctx.rotate(Math.PI/2);
     ctx.translate(0, R*1.02);
@@ -257,18 +377,11 @@
     for(let y=-off; y<cvs.height; y+=spacing){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(cvs.width,y); ctx.stroke(); }
     ctx.restore();
 
-    // jugador (aura): círculo con pulso
-    const p=S.player; const pulse = 1 + (Math.sin(t*6)*0.06);
-    ctx.save();
-    ctx.shadowColor = 'rgba(245,158,11,.6)'; ctx.shadowBlur = 20;
-    ctx.fillStyle = '#f59e0b';
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.r*pulse, 0, Math.PI*2); ctx.fill();
-    // aura externa
-    ctx.globalAlpha = .35; ctx.beginPath(); ctx.arc(p.x, p.y, p.r*1.8, 0, Math.PI*2); ctx.strokeStyle='#fbbf24'; ctx.lineWidth=2; ctx.stroke();
-    ctx.restore();
-    // ======= NUEVO: colisiones elásticas entre trompos =======
-    // Discos de igual masa: intercambio de componente normal de la velocidad.
-    // Incluye corrección de penetración para que no se queden encimados.
+    // ===== jugador: cara de Gon =====
+    const p=S.player;
+    drawGonHead(p.x, p.y, p.r);
+
+    // ======= colisiones elásticas entre trompos (según tu última versión) =======
     for (let i = 0; i < S.bullets.length; i++) {
       for (let j = i + 1; j < S.bullets.length; j++) {
         const a = S.bullets[i], b = S.bullets[j];
@@ -280,29 +393,22 @@
 
         if (dist2 <= minDist * minDist) {
           const dist = Math.sqrt(dist2) || 1;
-          const nx = dx / dist, ny = dy / dist;        // normal de colisión
+          const nx = dx / dist, ny = dy / dist;
 
-          // Velocidad relativa proyectada en la normal
           const rvx = b.vx - a.vx, rvy = b.vy - a.vy;
           const relVelN = rvx * nx + rvy * ny;
 
-          // Si ya se están separando, no aplicar impulso
           if (relVelN < 0) {
-            const e = 1.0; // restitución (1 = elástico)
-            // masas iguales m1 = m2 = 1 => (1/m1 + 1/m2) = 2
+            const e = 1.0;
             const j = -(1 + e) * relVelN / 2;
-
-            // Impulso
             const ix = j * nx, iy = j * ny;
             a.vx -= ix; a.vy -= iy;
             b.vx += ix; b.vy += iy;
           }
 
-          // Corrección de penetración (positional correction)
           const penetration = minDist - dist;
           if (penetration > 0) {
-            const percent = 0.8;     // empuje correctivo (80%)
-            const slop = 0.01;       // tolerancia
+            const percent = 0.8, slop = 0.01;
             const corr = Math.max(penetration - slop, 0) / 2 * percent;
             const cx = corr * nx, cy = corr * ny;
             a.x -= cx; a.y -= cy;
@@ -311,7 +417,8 @@
         }
       }
     }
-    // balas: ahora son trompos (tipo Gido)
+
+    // balas: trompos (Gido)
     for(const b of S.bullets){ drawTop(b); }
 
     // pickups (verdes)
