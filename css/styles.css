@@ -150,28 +150,6 @@ canvas {
     font-weight: 700
 }
 
-.g {
-    color: var(--good)
-}
-
-.r {
-    color: var(--bad)
-}
-
-.req {
-    margin-top: 10px;
-    color: var(--accent)
-}
-
-footer {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
-    color: var(--muted);
-    font-size: 12px;
-    border-top: 1px solid #1f2937
-}
-
 a {
     color: var(--accent)
 }
